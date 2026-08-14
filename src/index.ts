@@ -1,9 +1,18 @@
-/** Financial research and portfolio-risk workflow tools for DeepSeek Harness. */
+/** Finance, accounting, research, and portfolio-risk workflow tools for DeepSeek Harness. */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import '@deepseek-ai/dsh-skill'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import {
+  analyzeVarianceBridge,
+  checkJournalEntry,
+  reconcileAccount,
+  RECONCILIATION_CATEGORIES,
+  type JournalEntryCheckArgs,
+  type ReconciliationArgs,
+  type VarianceBridgeArgs,
+} from './accounting.js'
 import { analyzePortfolioRisk, type PortfolioRiskArgs } from './portfolio.js'
 import { buildResearchWorkflow, RESEARCH_WORKFLOWS, type ResearchWorkflowArgs } from './research.js'
 
@@ -26,24 +35,179 @@ function toJsonRecord(value: unknown): { [key: string]: JsonValue } {
   return JSON.parse(JSON.stringify(value)) as { [key: string]: JsonValue }
 }
 
-export function apply(ctx: Context): void {
-  ctx.skills.register({
+const BUNDLED_SKILLS = [
+  {
+    name: 'dsh-finance-journal-entry',
+    description: 'Prepare balanced journal entries with support, review controls, and explicit human posting authority.',
+    path: 'skills/dsh-finance-journal-entry/SKILL.md',
+  },
+  {
+    name: 'dsh-finance-journal-entry-prep',
+    description: 'Apply accounting guidance for accruals, prepaids, depreciation, payroll, revenue, and manual entries.',
+    path: 'skills/dsh-finance-journal-entry-prep/SKILL.md',
+  },
+  {
+    name: 'dsh-finance-reconciliation',
+    description: 'Reconcile GL, subledger, bank, and intercompany balances with aging and escalation controls.',
+    path: 'skills/dsh-finance-reconciliation/SKILL.md',
+  },
+  {
+    name: 'dsh-finance-financial-statements',
+    description: 'Prepare income statements, balance sheets, and cash flow statements with comparison and variance review.',
+    path: 'skills/dsh-finance-financial-statements/SKILL.md',
+  },
+  {
+    name: 'dsh-finance-variance-analysis',
+    description: 'Decompose budget, forecast, and period variances into quantified, reconciled drivers.',
+    path: 'skills/dsh-finance-variance-analysis/SKILL.md',
+  },
+  {
+    name: 'dsh-finance-close-management',
+    description: 'Plan and track month-end close tasks, dependencies, blockers, deadlines, and process improvements.',
+    path: 'skills/dsh-finance-close-management/SKILL.md',
+  },
+  {
+    name: 'dsh-finance-audit-support',
+    description: 'Support SOX 404 scoping, control testing, sampling, evidence, and deficiency evaluation.',
+    path: 'skills/dsh-finance-audit-support/SKILL.md',
+  },
+  {
+    name: 'dsh-finance-sox-testing',
+    description: 'Build SOX control matrices, sample selections, testing workpapers, and assessment templates.',
+    path: 'skills/dsh-finance-sox-testing/SKILL.md',
+  },
+  {
     name: 'dsh-finance-research',
     description: 'Plan source-backed public market research without inventing current financial facts.',
-    content: skillContent('skills/finance-research/SKILL.md'),
-    source: 'bundled',
-    resourceBase: { kind: 'directory', path: PACKAGE_ROOT },
-    invocation: { modelInvocable: true, userInvocable: true },
-  })
-
-  ctx.skills.register({
+    path: 'skills/finance-research/SKILL.md',
+  },
+  {
     name: 'dsh-portfolio-risk',
     description: 'Review user-supplied portfolio exposure, concentration, cash, and risk-control flags.',
-    content: skillContent('skills/portfolio-risk/SKILL.md'),
-    source: 'bundled',
-    resourceBase: { kind: 'directory', path: PACKAGE_ROOT },
-    invocation: { modelInvocable: true, userInvocable: true },
-  })
+    path: 'skills/portfolio-risk/SKILL.md',
+  },
+] as const
+
+export function apply(ctx: Context): void {
+  for (const skill of BUNDLED_SKILLS) {
+    ctx.skills.register({
+      name: skill.name,
+      description: skill.description,
+      content: skillContent(skill.path),
+      source: 'bundled',
+      resourceBase: { kind: 'directory', path: PACKAGE_ROOT },
+      invocation: { modelInvocable: true, userInvocable: true },
+    })
+  }
+
+  ctx.tools.register(defineTool({
+    name: 'finance_journal_entry_check',
+    description:
+      'Validate a proposed journal entry for debit-credit balance, line structure, documentation gaps, and segregation-of-duties review. ' +
+      'This control check never authorizes posting.',
+    parameters: {
+      lines: {
+        type: 'array',
+        required: true,
+        description: 'Journal entry lines. Use non-negative debit and credit amounts and one side per line.',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            accountCode: { type: 'string' },
+            accountName: { type: 'string', required: true },
+            debit: { type: 'number' },
+            credit: { type: 'number' },
+            department: { type: 'string' },
+            memo: { type: 'string' },
+          },
+        },
+      },
+      period: { type: 'string', description: 'Accounting period, such as 2026-07 or 2026-Q3.' },
+      currency: { type: 'string', description: 'Currency code. Defaults to USD.' },
+      tolerance: { type: 'number', description: 'Maximum allowed debit-credit difference. Defaults to 0.01.' },
+      preparedBy: { type: 'string', description: 'Optional preparer identifier for segregation review.' },
+      approvedBy: { type: 'string', description: 'Optional approver identifier for segregation review.' },
+    },
+    output: {
+      schema: { type: 'object', additionalProperties: true },
+      render: (_args, value) => [{ type: 'text', text: renderJson(value) }],
+    },
+    execute: async args => toJsonRecord(checkJournalEntry(args as JournalEntryCheckArgs)),
+    timeoutMs: 5000,
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'finance_reconciliation_snapshot',
+    description:
+      'Reconcile book and source balances using signed adjustments, categorize reconciling items, calculate aging, and determine review readiness. ' +
+      'This control check never authorizes sign-off.',
+    parameters: {
+      bookBalance: { type: 'number', required: true, description: 'Unadjusted GL or book balance.' },
+      sourceBalance: { type: 'number', required: true, description: 'Unadjusted subledger, bank, or third-party balance.' },
+      items: {
+        type: 'array',
+        description: 'Signed reconciling adjustments added to either the book or source balance.',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            description: { type: 'string', required: true },
+            amount: { type: 'number', required: true },
+            appliesTo: { type: 'string', required: true, description: 'book or source' },
+            category: {
+              type: 'string',
+              required: true,
+              description: `One of: ${RECONCILIATION_CATEGORIES.join(', ')}.`,
+            },
+            originatedDate: { type: 'string', description: 'YYYY-MM-DD date used for aging.' },
+            owner: { type: 'string' },
+          },
+        },
+      },
+      asOfDate: { type: 'string', description: 'YYYY-MM-DD reconciliation date.' },
+      tolerance: { type: 'number', description: 'Maximum allowed adjusted difference. Defaults to 0.01.' },
+      staleAfterDays: { type: 'number', description: 'Age at which an item is stale. Defaults to 90 days.' },
+    },
+    output: {
+      schema: { type: 'object', additionalProperties: true },
+      render: (_args, value) => [{ type: 'text', text: renderJson(value) }],
+    },
+    execute: async args => toJsonRecord(reconcileAccount(args as ReconciliationArgs)),
+    timeoutMs: 5000,
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'finance_variance_bridge',
+    description:
+      'Validate that signed variance drivers bridge a base value to an actual value, calculate residuals and percentage variance, and evaluate optional materiality thresholds.',
+    parameters: {
+      baseValue: { type: 'number', required: true, description: 'Budget, forecast, or prior-period value.' },
+      actualValue: { type: 'number', required: true, description: 'Actual or current-period value.' },
+      drivers: {
+        type: 'array',
+        required: true,
+        description: 'Signed drivers that should sum to actualValue minus baseValue.',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            name: { type: 'string', required: true },
+            amount: { type: 'number', required: true },
+          },
+        },
+      },
+      tolerance: { type: 'number', description: 'Maximum allowed bridge residual. Defaults to 0.01.' },
+      dollarMateriality: { type: 'number', description: 'Optional absolute amount threshold.' },
+      percentMateriality: { type: 'number', description: 'Optional absolute percentage threshold.' },
+    },
+    output: {
+      schema: { type: 'object', additionalProperties: true },
+      render: (_args, value) => [{ type: 'text', text: renderJson(value) }],
+    },
+    execute: async args => toJsonRecord(analyzeVarianceBridge(args as VarianceBridgeArgs)),
+    timeoutMs: 5000,
+  }))
 
   ctx.tools.register(defineTool({
     name: 'finance_research_workflow',
