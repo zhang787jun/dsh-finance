@@ -1,0 +1,4 @@
+# Added when a DeepSeek Harness profile installs the dsh-finance bundle.
+- insert:
+    - id: finance
+      name: dsh-finance

@@ -1,0 +1,70 @@
+{
+  "name": "dsh-finance",
+  "version": "0.1.0",
+  "description": "Financial research and portfolio risk workflow tools for DeepSeek Harness.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build && npm pack --dry-run",
+    "prepack": "pnpm run build"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "finance",
+    "financial-research",
+    "portfolio-risk",
+    "investment-research"
+  ],
+  "homepage": "https://github.com/zhang787jun/dsh-finance#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhang787jun/dsh-finance.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zhang787jun/dsh-finance/issues"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.1 <5",
+    "@deepseek-ai/dsh-skill": ">=0.1.0-rc.6 <0.2.0",
+    "@deepseek-ai/dsh-tools": ">=0.1.0-rc.6 <0.2.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-skill": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-tools": "0.1.0-rc.6",
+    "@types/node": "^24.0.0",
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.8"
+  },
+  "packageManager": "pnpm@11.19.0"
+}

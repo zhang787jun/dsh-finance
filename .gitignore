@@ -1,0 +1,10 @@
+dsh-web.log
+dsh-web-error.log
+.env
+node_modules/
+.pnpm-store/
+dist/
+.dsh-smoke/
+.npm-cache/
+*.tgz
+coverage/
