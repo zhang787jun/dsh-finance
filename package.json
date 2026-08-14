@@ -1,8 +1,8 @@
 {
   "name": "dsh-finance",
-  "version": "0.1.0",
-  "description": "Financial research and portfolio risk workflow tools for DeepSeek Harness.",
-  "license": "MIT",
+  "version": "0.2.0",
+  "description": "Finance and accounting workflows for DeepSeek Harness, adapted from Anthropic's Finance plugin.",
+  "license": "MIT AND Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,7 +20,11 @@
     "cordis.patch.yml",
     "README.md",
     "README.zh-CN.md",
-    "LICENSE"
+    "CONNECTORS.md",
+    "connectors.example.json",
+    "THIRD_PARTY_NOTICES.md",
+    "LICENSE",
+    "LICENSES"
   ],
   "dsh": {
     "bundle": {
@@ -31,13 +35,18 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "check": "pnpm run typecheck && pnpm run test && pnpm run build && npm pack --dry-run",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build && npm pack --dry-run --cache .npm-cache",
     "prepack": "pnpm run build"
   },
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
     "finance",
+    "accounting",
+    "month-end-close",
+    "journal-entry",
+    "reconciliation",
+    "sox",
     "financial-research",
     "portfolio-risk",
     "investment-research"

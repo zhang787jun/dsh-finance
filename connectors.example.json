@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "erp": {
+      "type": "http",
+      "url": "https://replace-with-approved-erp-mcp.example/mcp"
+    },
+    "data-warehouse": {
+      "type": "http",
+      "url": "https://replace-with-approved-warehouse-mcp.example/mcp"
+    },
+    "office-suite": {
+      "type": "http",
+      "url": "https://replace-with-approved-office-mcp.example/mcp"
+    },
+    "analytics": {
+      "type": "http",
+      "url": "https://replace-with-approved-bi-mcp.example/mcp"
+    }
+  }
+}
