@@ -10,7 +10,7 @@ Version 0.2 is a capability-level DSH adaptation of Anthropic's official [`finan
 
 The source baseline is Anthropic Finance `1.3.0` at commit [`a006314`](https://github.com/anthropics/knowledge-work-plugins/commit/a006314fa00e3b7487f3b6ef7f6b4a216ae777df). This is an independent community adaptation and is not endorsed by Anthropic.
 
-[简体中文](./README.zh-CN.md)
+[Simplified Chinese](./README.zh-CN.md)
 
 ## Upstream parity
 
