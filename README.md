@@ -12,17 +12,6 @@ The source baseline is Anthropic Finance `1.3.0` at commit [`a006314`](https://g
 
 [简体中文](./README.zh-CN.md)
 
-## Engineering focus
-
-The work in this repository is the DSH adaptation and its validation layer; the eight finance skill workflows originate upstream.
-
-- **Adaptation and boundaries:** DSH skill invocation, connector expectations, and human-review controls. See [CONNECTORS.md](./CONNECTORS.md) and [source attribution](./THIRD_PARTY_NOTICES.md).
-- **Deterministic accounting checks:** journal-entry validation, reconciliation calculations, and variance bridges in [src/accounting.ts](./src/accounting.ts).
-- **Additional workflows:** public-market research planning and portfolio exposure checks in [src/research.ts](./src/research.ts) and [src/portfolio.ts](./src/portfolio.ts).
-- **Verification:** focused tests in [tests/](./tests/) and the typecheck, test, build, and package checks described below.
-
-This is a community plugin at version 0.2.0, not a certified accounting system or an autonomous approval service. Included tests and a CI badge do not establish compatibility with every DSH release or fitness for a particular accounting process. Validate the pinned dependencies and representative workflows in your own environment before use.
-
 ## Upstream parity
 
 | Anthropic Finance skill | DSH skill | Coverage |
@@ -51,8 +40,6 @@ The plugin registers five tools:
 The last two are DSH extensions retained from version 0.1. They are not presented as part of Anthropic Finance parity.
 
 ## Install
-
-Prerequisites are declared in [package.json](./package.json): Node.js `^22.19.0 || >=24.0.0` and pnpm `11.19.0` for development. DSH peer dependency ranges are listed there as well.
 
 Install from GitHub into a DSH profile:
 
