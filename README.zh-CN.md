@@ -12,6 +12,17 @@
 
 [English](./README.md)
 
+## 工程重点
+
+本仓库的工作集中在 DSH 适配与校验层；8 项财务技能的专业工作流来自上游。
+
+- **适配与边界：** DSH 技能调用、连接器要求与人工复核控制，见 [CONNECTORS.md](./CONNECTORS.md) 和[来源说明](./THIRD_PARTY_NOTICES.md)。
+- **确定性会计校验：** [src/accounting.ts](./src/accounting.ts) 中的分录校验、对账计算与差异桥接。
+- **扩展工作流：** [src/research.ts](./src/research.ts) 和 [src/portfolio.ts](./src/portfolio.ts) 中的公开市场研究规划与持仓敞口检查。
+- **验证入口：** [tests/](./tests/) 下的测试，以及下文列出的类型检查、测试、构建和打包检查。
+
+当前为 0.2.0 版社区插件，不是经过认证的会计系统或自主审批服务。已有测试与 CI 徽章不代表兼容所有 DSH 版本，也不证明适用于特定会计流程。使用前应在自己的环境中验证锁定依赖和代表性工作流。
+
 ## 上游能力对照
 
 | Anthropic Finance 技能 | DSH 技能 | 覆盖内容 |
@@ -40,6 +51,8 @@
 后两项是 `0.1` 版保留的 DSH 扩展，不计入 Anthropic Finance 的对等迁移。
 
 ## 安装
+
+开发环境要求见 [package.json](./package.json)：Node.js `^22.19.0 || >=24.0.0`、pnpm `11.19.0`；DSH 相关 peer dependency 范围也在该文件中声明。
 
 ```sh
 dsh plugin --profile web add github:zhang787jun/dsh-finance
