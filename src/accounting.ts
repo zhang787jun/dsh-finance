@@ -1,3 +1,6 @@
+import { addCents, fromCents, toCents } from './money.js'
+import { exceedsThreshold } from './thresholds.js'
+
 export interface JournalEntryLine {
   accountCode?: string
   accountName: string
@@ -141,6 +144,8 @@ export function checkJournalEntry(args: JournalEntryCheckArgs): JournalEntryChec
   const tolerance = nonNegative(args.tolerance, 0.01, 'tolerance')
   const blockingFlags: string[] = []
   const reviewFlags: string[] = []
+  let debitCents = 0
+  let creditCents = 0
 
   const lines = args.lines.map((line, index) => {
     const lineNumber = index + 1
@@ -153,9 +158,15 @@ export function checkJournalEntry(args: JournalEntryCheckArgs): JournalEntryChec
     assertFiniteNumber(credit, `lines[${index}].credit`)
     if (debit < 0 || credit < 0) throw new Error(`lines[${index}] debit and credit must be non-negative`)
 
-    if (debit > tolerance && credit > tolerance) {
+    const lineDebitCents = toCents(debit, `lines[${index}].debit`)
+    const lineCreditCents = toCents(credit, `lines[${index}].credit`)
+    debitCents = addCents(debitCents, lineDebitCents, 'totalDebit')
+    creditCents = addCents(creditCents, lineCreditCents, 'totalCredit')
+
+    // Tolerance applies to the entry's balance, never to its line structure.
+    if (debit > 0 && credit > 0) {
       blockingFlags.push(`Line ${lineNumber} has both debit and credit amounts.`)
-    } else if (debit <= tolerance && credit <= tolerance) {
+    } else if (lineDebitCents === 0 && lineCreditCents === 0) {
       blockingFlags.push(`Line ${lineNumber} has no debit or credit amount.`)
     }
     if (!line.accountCode?.trim()) reviewFlags.push(`Line ${lineNumber} is missing an account code.`)
@@ -168,14 +179,14 @@ export function checkJournalEntry(args: JournalEntryCheckArgs): JournalEntryChec
       accountCode: line.accountCode?.trim() || undefined,
       department: line.department?.trim() || undefined,
       memo: line.memo?.trim() || undefined,
-      debit: round(debit),
-      credit: round(credit),
+      debit: fromCents(lineDebitCents),
+      credit: fromCents(lineCreditCents),
     }
   })
 
-  const totalDebit = round(lines.reduce((sum, line) => sum + line.debit, 0))
-  const totalCredit = round(lines.reduce((sum, line) => sum + line.credit, 0))
-  const difference = round(totalDebit - totalCredit)
+  const totalDebit = fromCents(debitCents)
+  const totalCredit = fromCents(creditCents)
+  const difference = fromCents(addCents(debitCents, -creditCents, 'difference'))
   const balanced = Math.abs(difference) <= tolerance
   if (!balanced) blockingFlags.push(`Entry is out of balance by ${Math.abs(difference).toFixed(2)}.`)
 
@@ -201,22 +212,27 @@ export function checkJournalEntry(args: JournalEntryCheckArgs): JournalEntryChec
 }
 
 export function reconcileAccount(args: ReconciliationArgs): ReconciliationResult {
-  assertFiniteNumber(args.bookBalance, 'bookBalance')
-  assertFiniteNumber(args.sourceBalance, 'sourceBalance')
+  const bookCents = toCents(args.bookBalance, 'bookBalance')
+  const sourceCents = toCents(args.sourceBalance, 'sourceBalance')
   const tolerance = nonNegative(args.tolerance, 0.01, 'tolerance')
   const staleAfterDays = nonNegative(args.staleAfterDays, 90, 'staleAfterDays')
   const asOfTimestamp = args.asOfDate ? parseDate(args.asOfDate, 'asOfDate') : null
   const flags: string[] = []
-  const categoryTotals: Record<ReconciliationCategory, number> = {
+  const categoryCents: Record<ReconciliationCategory, number> = {
     timing: 0,
     adjustment_required: 0,
     investigation: 0,
+  }
+  let bookAdjustmentCents = 0
+  let sourceAdjustmentCents = 0
+  if (args.items?.length && asOfTimestamp === null) {
+    flags.push('An as-of date is required to assess item aging before sign-off.')
   }
 
   const items = (args.items ?? []).map((item, index) => {
     const description = item.description.trim()
     if (description.length === 0) throw new Error(`items[${index}].description is required`)
-    assertFiniteNumber(item.amount, `items[${index}].amount`)
+    const amountCents = toCents(item.amount, `items[${index}].amount`)
     if (item.appliesTo !== 'book' && item.appliesTo !== 'source') {
       throw new Error(`items[${index}].appliesTo must be book or source`)
     }
@@ -231,6 +247,8 @@ export function reconcileAccount(args: ReconciliationArgs): ReconciliationResult
         ageDays = Math.floor((asOfTimestamp - originatedTimestamp) / 86_400_000)
         if (ageDays < 0) flags.push(`${description} has an originated date after the as-of date.`)
       }
+    } else {
+      flags.push(`${description} is missing an originated date; aging is unavailable.`)
     }
     const stale = ageDays !== null && ageDays > staleAfterDays
     if (stale) flags.push(`${description} is stale at ${ageDays} days.`)
@@ -238,51 +256,54 @@ export function reconcileAccount(args: ReconciliationArgs): ReconciliationResult
       flags.push(`${description} requires an adjusting entry before sign-off.`)
     }
     if (item.category === 'investigation') flags.push(`${description} remains under investigation.`)
-    categoryTotals[item.category] = round(categoryTotals[item.category] + item.amount)
+    categoryCents[item.category] = addCents(categoryCents[item.category], amountCents, `${item.category} total`)
+    if (item.appliesTo === 'book') {
+      bookAdjustmentCents = addCents(bookAdjustmentCents, amountCents, 'bookAdjustments')
+    } else {
+      sourceAdjustmentCents = addCents(sourceAdjustmentCents, amountCents, 'sourceAdjustments')
+    }
 
     return {
       ...item,
       description,
       owner: item.owner?.trim() || undefined,
-      amount: round(item.amount),
+      amount: fromCents(amountCents),
       ageDays,
       stale,
     }
   })
 
-  const bookAdjustments = round(items
-    .filter(item => item.appliesTo === 'book')
-    .reduce((sum, item) => sum + item.amount, 0))
-  const sourceAdjustments = round(items
-    .filter(item => item.appliesTo === 'source')
-    .reduce((sum, item) => sum + item.amount, 0))
-  const adjustedBookBalance = round(args.bookBalance + bookAdjustments)
-  const adjustedSourceBalance = round(args.sourceBalance + sourceAdjustments)
-  const difference = round(adjustedBookBalance - adjustedSourceBalance)
+  const adjustedBookCents = addCents(bookCents, bookAdjustmentCents, 'adjustedBookBalance')
+  const adjustedSourceCents = addCents(sourceCents, sourceAdjustmentCents, 'adjustedSourceBalance')
+  const difference = fromCents(addCents(adjustedBookCents, -adjustedSourceCents, 'difference'))
   const reconciled = Math.abs(difference) <= tolerance
   if (!reconciled) flags.push(`Adjusted balances differ by ${Math.abs(difference).toFixed(2)}.`)
 
   return {
-    bookBalance: round(args.bookBalance),
-    sourceBalance: round(args.sourceBalance),
-    bookAdjustments,
-    sourceAdjustments,
-    adjustedBookBalance,
-    adjustedSourceBalance,
+    bookBalance: fromCents(bookCents),
+    sourceBalance: fromCents(sourceCents),
+    bookAdjustments: fromCents(bookAdjustmentCents),
+    sourceAdjustments: fromCents(sourceAdjustmentCents),
+    adjustedBookBalance: fromCents(adjustedBookCents),
+    adjustedSourceBalance: fromCents(adjustedSourceCents),
     difference,
     reconciled,
     signOffReady: reconciled && !items.some(item =>
-      item.category !== 'timing' || item.stale || (item.ageDays !== null && item.ageDays < 0)),
+      item.category !== 'timing' || item.stale || item.ageDays === null || item.ageDays < 0),
     items,
-    categoryTotals,
+    categoryTotals: {
+      timing: fromCents(categoryCents.timing),
+      adjustment_required: fromCents(categoryCents.adjustment_required),
+      investigation: fromCents(categoryCents.investigation),
+    },
     flags,
     signOffAuthorized: false,
   }
 }
 
 export function analyzeVarianceBridge(args: VarianceBridgeArgs): VarianceBridgeResult {
-  assertFiniteNumber(args.baseValue, 'baseValue')
-  assertFiniteNumber(args.actualValue, 'actualValue')
+  const baseCents = toCents(args.baseValue, 'baseValue')
+  const actualCents = toCents(args.actualValue, 'actualValue')
   if (!Array.isArray(args.drivers) || args.drivers.length === 0) {
     throw new Error('drivers must contain at least one variance driver')
   }
@@ -294,32 +315,36 @@ export function analyzeVarianceBridge(args: VarianceBridgeArgs): VarianceBridgeR
   const percentThreshold = args.percentMateriality === undefined
     ? null
     : nonNegative(args.percentMateriality, 0, 'percentMateriality')
-  const totalVariance = round(args.actualValue - args.baseValue)
-  const percentVariance = args.baseValue === 0
+  const varianceCents = addCents(actualCents, -baseCents, 'totalVariance')
+  const totalVariance = fromCents(varianceCents)
+  const rawPercentVariance = baseCents === 0
     ? null
-    : round((totalVariance / Math.abs(args.baseValue)) * 100)
+    : (varianceCents / Math.abs(baseCents)) * 100
+  const percentVariance = rawPercentVariance === null ? null : round(rawPercentVariance)
   const flags: string[] = []
   const seenNames = new Set<string>()
-  let cumulative = round(args.baseValue)
+  let cumulativeCents = baseCents
+  let driverCents = 0
 
   const drivers = args.drivers.map((driver, index) => {
     const name = driver.name.trim()
     if (name.length === 0) throw new Error(`drivers[${index}].name is required`)
-    assertFiniteNumber(driver.amount, `drivers[${index}].amount`)
+    const amountCents = toCents(driver.amount, `drivers[${index}].amount`)
     const normalizedName = name.toLowerCase()
     if (seenNames.has(normalizedName)) flags.push(`Duplicate driver name: ${name}.`)
     seenNames.add(normalizedName)
-    cumulative = round(cumulative + driver.amount)
+    cumulativeCents = addCents(cumulativeCents, amountCents, 'cumulative')
+    driverCents = addCents(driverCents, amountCents, 'driverTotal')
     return {
       name,
-      amount: round(driver.amount),
-      cumulative,
-      pctOfVariance: totalVariance === 0 ? null : round((driver.amount / totalVariance) * 100),
+      amount: fromCents(amountCents),
+      cumulative: fromCents(cumulativeCents),
+      pctOfVariance: varianceCents === 0 ? null : round((amountCents / varianceCents) * 100),
     }
   })
 
-  const driverTotal = round(drivers.reduce((sum, driver) => sum + driver.amount, 0))
-  const residual = round(totalVariance - driverTotal)
+  const driverTotal = fromCents(driverCents)
+  const residual = fromCents(addCents(varianceCents, -driverCents, 'residual'))
   const reconciled = Math.abs(residual) <= tolerance
   if (!reconciled) flags.push(`Variance bridge has an unreconciled residual of ${residual.toFixed(2)}.`)
   if (percentVariance === null) flags.push('Percentage variance is unavailable because the base value is zero.')
@@ -328,13 +353,13 @@ export function analyzeVarianceBridge(args: VarianceBridgeArgs): VarianceBridgeR
   if (dollarThreshold !== null && Math.abs(totalVariance) >= dollarThreshold) {
     reasons.push(`Absolute variance meets the ${dollarThreshold.toFixed(2)} dollar threshold.`)
   }
-  if (percentThreshold !== null && percentVariance !== null && Math.abs(percentVariance) >= percentThreshold) {
+  if (percentThreshold !== null && rawPercentVariance !== null && !exceedsThreshold(percentThreshold, Math.abs(rawPercentVariance))) {
     reasons.push(`Absolute percentage variance meets the ${percentThreshold.toFixed(2)}% threshold.`)
   }
 
   return {
-    baseValue: round(args.baseValue),
-    actualValue: round(args.actualValue),
+    baseValue: fromCents(baseCents),
+    actualValue: fromCents(actualCents),
     totalVariance,
     percentVariance,
     direction: totalVariance > tolerance ? 'increase' : totalVariance < -tolerance ? 'decrease' : 'flat',

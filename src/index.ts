@@ -109,7 +109,7 @@ export function apply(ctx: Context): void {
       lines: {
         type: 'array',
         required: true,
-        description: 'Journal entry lines. Use non-negative debit and credit amounts and one side per line.',
+        description: 'Journal entry lines. Use non-negative debit and credit amounts and one side per line. Amounts are rounded to two decimals, half away from zero.',
         items: {
           type: 'object',
           additionalProperties: false,
@@ -125,7 +125,7 @@ export function apply(ctx: Context): void {
       },
       period: { type: 'string', description: 'Accounting period, such as 2026-07 or 2026-Q3.' },
       currency: { type: 'string', description: 'Currency code. Defaults to USD.' },
-      tolerance: { type: 'number', description: 'Maximum allowed debit-credit difference. Defaults to 0.01.' },
+      tolerance: { type: 'number', description: 'Maximum allowed debit-credit difference. Defaults to 0.01. Does not relax line structure checks.' },
       preparedBy: { type: 'string', description: 'Optional preparer identifier for segregation review.' },
       approvedBy: { type: 'string', description: 'Optional approver identifier for segregation review.' },
     },
@@ -160,12 +160,12 @@ export function apply(ctx: Context): void {
               required: true,
               description: `One of: ${RECONCILIATION_CATEGORIES.join(', ')}.`,
             },
-            originatedDate: { type: 'string', description: 'YYYY-MM-DD date used for aging.' },
+            originatedDate: { type: 'string', description: 'YYYY-MM-DD date used for aging. Required for sign-off readiness when items exist.' },
             owner: { type: 'string' },
           },
         },
       },
-      asOfDate: { type: 'string', description: 'YYYY-MM-DD reconciliation date.' },
+      asOfDate: { type: 'string', description: 'YYYY-MM-DD reconciliation date. Required for sign-off readiness when items exist.' },
       tolerance: { type: 'number', description: 'Maximum allowed adjusted difference. Defaults to 0.01.' },
       staleAfterDays: { type: 'number', description: 'Age at which an item is stale. Defaults to 90 days.' },
     },
@@ -259,7 +259,7 @@ export function apply(ctx: Context): void {
       positions: {
         type: 'array',
         required: true,
-        description: 'Positions with symbol, marketValue, and optional sector or assetClass.',
+        description: 'Positions with symbol, marketValue, and optional sector or assetClass. Repeated symbols are aggregated for gross concentration checks; use distinct identifiers for different securities.',
         items: {
           type: 'object',
           additionalProperties: false,
