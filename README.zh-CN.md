@@ -12,6 +12,12 @@
 
 [English](./README.md)
 
+## 客户交流与支持
+
+本仓库作为公开的客户交流入口，集中维护插件文档、版本发布、问题反馈与功能建议。请通过 [Issues](https://github.com/zhang787jun/dsh-finance/issues) 说明插件版本、预期结果和实际结果，并使用匿名化的小样例。
+
+客户记录、账户报表、个人持仓、专有策略与凭据保留在约定的私有工作空间。插件可独立安装，无需访问私有投研仓库。支持范围与组合指标口径见 [支持说明](docs/client-support.md)。
+
 ## 上游能力对照
 
 | Anthropic Finance 技能 | DSH 技能 | 覆盖内容 |

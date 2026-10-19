@@ -12,6 +12,14 @@ The source baseline is Anthropic Finance `1.3.0` at commit [`a006314`](https://g
 
 [简体中文](./README.zh-CN.md)
 
+## Client discussion and support
+
+This is the public home for client questions, feature requests, plugin documentation and releases. Use [Issues](https://github.com/zhang787jun/dsh-finance/issues) for feedback with a small, anonymized example. Describe the expected result, the actual result and your plugin version.
+
+Keep account statements, customer records, private positions, proprietary strategies and credentials in your agreed private workspace. This plugin installs independently; access to any private research repository is not required.
+
+See [the support guide](docs/client-support.md) for scope and portfolio metric conventions.
+
 ## Upstream parity
 
 | Anthropic Finance skill | DSH skill | Coverage |
