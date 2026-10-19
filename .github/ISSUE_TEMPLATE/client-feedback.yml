@@ -1,0 +1,34 @@
+name: Client feedback / 客户反馈
+description: Ask a question, report a problem, or suggest an improvement.
+title: "[Feedback] "
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: Type / 类型
+      options:
+        - Question / 使用问题
+        - Bug / 错误反馈
+        - Feature request / 功能建议
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version / 插件版本
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Expected and actual result / 预期与实际结果
+      description: Include a small anonymized example and steps, when applicable.
+    validations:
+      required: true
+  - type: checkboxes
+    id: public-data
+    attributes:
+      label: Public information / 公开信息
+      options:
+        - label: I have removed customer records, account details, positions, proprietary strategies and credentials. / 已移除客户资料、账户信息、持仓、专有策略与凭据。
+          required: true
